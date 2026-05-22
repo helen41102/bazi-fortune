@@ -1,0 +1,12 @@
+# 环境变量（含 API Key，绝对不能提交）
+backend/.env
+backend/__pycache__/
+*.pyc
+*.pyo
+
+# 虚拟环境
+venv/
+.venv/
+
+# 系统文件
+.DS_Store
