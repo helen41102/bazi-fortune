@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🔮 AI 八字测算</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: "Noto Serif SC", "STSong", "SimSun", serif; }
+    .pillar-card {
+      background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+      border: 1px solid rgba(255,255,255,0.12);
+      backdrop-filter: blur(10px);
+    }
+    @keyframes shimmer {
+      0% { background-position: -200% center; }
+      100% { background-position: 200% center; }
+    }
+    .loading-text {
+      background: linear-gradient(90deg,#a78bfa,#f472b6,#a78bfa);
+      background-size: 200%;
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      animation: shimmer 2s infinite;
+    }
+    .cursor::after { content:'▌'; animation: blink 1s step-end infinite; }
+    @keyframes blink { 50%{opacity:0;} }
+    .fade-in { animation: fadeIn 0.6s ease forwards; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(12px);} to{opacity:1;transform:translateY(0);} }
+    .wuxing-bar { transition: width 0.8s ease; }
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-indigo-950 via-purple-950 to-slate-900 text-white">
+
+  <div class="fixed inset-0 overflow-hidden pointer-events-none">
+    <div class="absolute -top-40 -right-40 w-96 h-96 bg-purple-500 rounded-full opacity-5 blur-3xl"></div>
+    <div class="absolute -bottom-40 -left-40 w-96 h-96 bg-indigo-500 rounded-full opacity-5 blur-3xl"></div>
+  </div>
+
+  <div class="relative max-w-lg mx-auto px-4 py-10">
+
+    <div class="text-center mb-10">
+      <div class="text-5xl mb-3">🔮</div>
+      <h1 class="text-3xl font-bold tracking-widest mb-2">AI 八字测算</h1>
+      <p class="text-purple-300 text-sm">输入生日 · 探索命理 · 仅供娱乐</p>
+    </div>
+
+    <!-- 输入表单 -->
+    <div class="pillar-card rounded-2xl p-6 mb-6" style="box-shadow:0 0 20px rgba(167,139,250,0.2)">
+      <h2 class="text-lg font-bold mb-5 text-purple-200">✍️ 填写信息</h2>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm text-purple-300 mb-1">姓名（可选）</label>
+          <input id="inp-name" type="text" placeholder="你的名字" maxlength="10"
+            class="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-white/30 focus:outline-none focus:border-purple-400 transition"/>
+        </div>
+        <div>
+          <label class="block text-sm text-purple-300 mb-1">出生日期 <span class="text-red-400">*</span></label>
+          <input id="inp-date" type="date"
+            class="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-purple-400 transition"/>
+        </div>
+        <div>
+          <label class="block text-sm text-purple-300 mb-1">出生时间 <span class="text-red-400">*</span></label>
+          <select id="inp-hour"
+            class="w-full bg-indigo-950 border border-white/20 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-purple-400 transition">
+            <option value="">— 选择时辰 —</option>
+            <option value="23">子时（23:00-01:00）</option>
+            <option value="1">丑时（01:00-03:00）</option>
+            <option value="3">寅时（03:00-05:00）</option>
+            <option value="5">卯时（05:00-07:00）</option>
+            <option value="7">辰时（07:00-09:00）</option>
+            <option value="9">巳时（09:00-11:00）</option>
+            <option value="11">午时（11:00-13:00）</option>
+            <option value="13">未时（13:00-15:00）</option>
+            <option value="15">申时（15:00-17:00）</option>
+            <option value="17">酉时（17:00-19:00）</option>
+            <option value="19">戌时（19:00-21:00）</option>
+            <option value="21">亥时（21:00-23:00）</option>
+          </select>
+        </div>
+      </div>
+      <button id="btn-start" onclick="getFortune()"
+        class="mt-6 w-full py-3.5 rounded-xl font-bold text-lg tracking-widest
+               bg-gradient-to-r from-purple-600 to-indigo-600
+               hover:from-purple-500 hover:to-indigo-500
+               active:scale-95 transition-all duration-200"
+        style="box-shadow:0 0 20px rgba(167,139,250,0.3)">
+        ✨ 开始测算
+      </button>
+    </div>
+
+    <!-- 加载中 -->
+    <div id="loading-section" class="hidden text-center py-16">
+      <div class="text-4xl mb-4 animate-spin">☯</div>
+      <p class="loading-text text-xl font-bold mb-2">正在推算命盘...</p>
+      <p class="text-purple-400 text-sm">天机运转，稍候片刻</p>
+    </div>
+
+    <!-- 结果 -->
+    <div id="result-section" class="hidden fade-in space-y-4">
+
+      <!-- 四柱 -->
+      <div class="pillar-card rounded-2xl p-6">
+        <h2 class="text-center text-purple-300 text-sm mb-4 tracking-widest">— 八字四柱 —</h2>
+        <div class="grid grid-cols-4 gap-2 text-center" id="bazi-pillars"></div>
+        <div class="mt-4 flex justify-center gap-4 text-sm text-purple-300" id="bazi-meta"></div>
+      </div>
+
+      <!-- 五行 -->
+      <div class="pillar-card rounded-2xl p-6">
+        <h2 class="text-purple-300 text-sm mb-4 tracking-widest">— 五行分布 —</h2>
+        <div id="wuxing-bars" class="space-y-2"></div>
+      </div>
+
+      <!-- AI 解读 -->
+      <div class="pillar-card rounded-2xl p-6">
+        <h2 class="text-purple-300 text-sm mb-4 tracking-widest">— AI 命理解读 —</h2>
+        <div id="analysis-content" class="text-sm leading-loose text-gray-200 whitespace-pre-wrap cursor"></div>
+      </div>
+
+      <button onclick="resetForm()"
+        class="w-full py-3 rounded-xl border border-white/20 text-purple-300 hover:bg-white/5 transition">
+        🔄 重新测算
+      </button>
+    </div>
+
+    <p class="text-center text-white/20 text-xs mt-8">本工具仅供娱乐，请勿迷信</p>
+  </div>
+
+<script>
+// ─── 八字计算（纯前端JS实现）──────────────────────────────────
+
+const TIANGAN = ["甲","乙","丙","丁","戊","己","庚","辛","壬","癸"];
+const DIZHI   = ["子","丑","寅","卯","辰","巳","午","未","申","酉","戌","亥"];
+const SHENGXIAO = ["鼠","牛","虎","兔","龙","蛇","马","羊","猴","鸡","狗","猪"];
+const XINGZUO = [
+  {name:"摩羯",end:[1,19]},{name:"水瓶",end:[2,18]},{name:"双鱼",end:[3,20]},
+  {name:"白羊",end:[4,19]},{name:"金牛",end:[5,20]},{name:"双子",end:[6,20]},
+  {name:"巨蟹",end:[7,22]},{name:"狮子",end:[8,22]},{name:"处女",end:[9,22]},
+  {name:"天秤",end:[10,22]},{name:"天蝎",end:[11,21]},{name:"射手",end:[12,21]},
+  {name:"摩羯",end:[12,31]}
+];
+
+const WUXING_TG = {甲:"木",乙:"木",丙:"火",丁:"火",戊:"土",己:"土",庚:"金",辛:"金",壬:"水",癸:"水"};
+const WUXING_DZ = {子:"水",亥:"水",寅:"木",卯:"木",午:"火",巳:"火",申:"金",酉:"金",辰:"土",戌:"土",丑:"土",未:"土"};
+
+// 计算年柱
+function getYearPillar(year) {
+  const tg = (year - 4) % 10;
+  const dz = (year - 4) % 12;
+  return TIANGAN[(tg+10)%10] + DIZHI[(dz+12)%12];
+}
+
+// 计算月柱（节气简化版：以月份近似）
+function getMonthPillar(year, month) {
+  const yearTG = (year - 4) % 10;
+  const baseTG = ((Math.floor(yearTG/5) * 2 + (yearTG % 5) * 2) + (month - 1)) % 10;
+  const dz = (month + 1) % 12;
+  return TIANGAN[(baseTG+10)%10] + DIZHI[dz];
+}
+
+// 计算日柱（基于儒略日）
+function getDayPillar(year, month, day) {
+  // 儒略日数计算
+  if (month <= 2) { year--; month += 12; }
+  const A = Math.floor(year / 100);
+  const B = 2 - A + Math.floor(A / 4);
+  const jd = Math.floor(365.25*(year+4716)) + Math.floor(30.6001*(month+1)) + day + B - 1524;
+  const tg = (jd - 11) % 10;
+  const dz = (jd - 11) % 12;
+  return TIANGAN[(tg+10)%10] + DIZHI[(dz+12)%12];
+}
+
+// 计算时柱
+function getHourPillar(dayTG, hour) {
+  // 时辰序号
+  const shiIdx = hour === 23 ? 0 : Math.floor((hour + 1) / 2);
+  // 日干序号 -> 时干起点
+  const dayTGIdx = TIANGAN.indexOf(dayTG);
+  const baseTG = (dayTGIdx % 5) * 2;
+  const tg = (baseTG + shiIdx) % 10;
+  return TIANGAN[tg] + DIZHI[shiIdx % 12];
+}
+
+// 获取星座
+function getXingZuo(month, day) {
+  for (const xz of XINGZUO) {
+    if (month < xz.end[0] || (month === xz.end[0] && day <= xz.end[1])) return xz.name;
+  }
+  return "摩羯";
+}
+
+// 计算五行统计
+function getWuXing(pillars) {
+  const count = {木:0,火:0,土:0,金:0,水:0};
+  for (const p of pillars) {
+    const tg = p[0], dz = p[1];
+    if (WUXING_TG[tg]) count[WUXING_TG[tg]]++;
+    if (WUXING_DZ[dz]) count[WUXING_DZ[dz]]++;
+  }
+  return count;
+}
+
+// AI 解读（纯本地模板，分支丰富）
+function generateAnalysis(name, pillars, wuxing, rizhu) {
+  const riWx = WUXING_TG[rizhu] || "未知";
+  const maxWx = Object.entries(wuxing).sort((a,b)=>b[1]-a[1])[0][0];
+  const minWx = Object.entries(wuxing).sort((a,b)=>a[1]-b[1])[0][0];
+
+  const nameStr = name ? `${name}，` : "";
+
+  const charMap = {
+    木:{char:"仁厚温和，富有创造力，内心敏感细腻，好奇心旺盛",career:"适合文创、教育、设计、咨询类方向，追求理想的你天生适合做开拓者",money:"财运稳中有升，适合长线投资，避免短线炒作"},
+    火:{char:"热情开朗，行动力强，有感染力和领导气质，容易成为焦点",career:"适合营销、公关、演讲、管理类方向，你的热情是最大的竞争力",money:"偏财运较旺，机会型收入多，但容易大手大脚，建议强制储蓄"},
+    土:{char:"踏实稳重，讲诚信，是朋友眼中最可靠的那个人，有点完美主义",career:"适合金融、地产、项目管理、技术类方向，耐心是你的核心优势",money:"正财稳健，一分耕耘一分收获型，适合定投低风险理财"},
+    金:{char:"果断干练，原则性强，审美出众，有点追求完美但执行力超强",career:"适合法律、工程、产品、战略类方向，逻辑思维是你的超能力",money:"财运平稳，善于规划，理财意识强，可考虑多元化配置"},
+    水:{char:"聪慧灵活，思维跳跃，社交能力强，学习能力一流，变通性极好",career:"适合互联网、研究、贸易、创业类方向，你的适应力让你走到哪都吃得开",money:"财来财去型，机遇多但需克制冲动消费，适合建立应急基金"},
+  };
+
+  const loveMap = {
+    木:"感情里你是温柔的付出者，重精神共鸣，遇到懂你的人才能全力投入",
+    火:"感情热烈直接，喜欢了就勇敢表达，但需注意三分钟热度，培养长期耐心",
+    土:"感情里你是慢热型，需要时间建立信任，但一旦认定就无比稳定忠诚",
+    金:"感情上理性多于感性，容易挑剔，但遇到契合的人会守护得很好",
+    水:"感情丰富细腻，共情能力强，有时候太多愁善感，记得保持自我边界",
+  };
+
+  const openMap = {
+    木:{color:"绿色、青色",dir:"东方",num:"3、8",tip:"多亲近自然，清晨散步是最好的充电方式"},
+    火:{color:"红色、橙色",dir:"南方",num:"2、7",tip:"戴一枚红色饰品，激活热情与贵人运"},
+    土:{color:"黄色、棕色",dir:"中央",num:"5、0",tip:"保持规律作息，稳定的生活节奏是你最强的护身符"},
+    金:{color:"白色、金色",dir:"西方",num:"4、9",tip:"佩戴白水晶或金属类饰品，提升决断力"},
+    水:{color:"黑色、蓝色",dir:"北方",num:"1、6",tip:"多喝水，保持水分；蓝色系工作空间能激活你的灵感"},
+  };
+
+  const c = charMap[riWx] || charMap["土"];
+  const love = loveMap[riWx] || loveMap["土"];
+  const open = openMap[minWx] || openMap["土"];
+
+  return `${nameStr}你的八字已推算完毕，以下是你的命理解读 ✨
+
+🌟 命格概述
+日主${rizhu}（${riWx}），${riWx}旺之命。八字中${maxWx}气最盛，${minWx}气偏弱，命格有进取之象，适合在稳中求变的节奏中发挥所长。
+
+💡 性格特质
+${c.char}。${maxWx}旺带来强劲的内驱力，有时候容易对自己要求过高，记得给自己留点喘息空间～
+
+🚀 事业学业
+${c.career}。今年整体运势向好，下半年尤其适合主动出击，抓住新机遇。
+
+💰 财运分析
+${c.money}。${minWx}弱需注意冲动决策，重大财务决策前多思考一步。
+
+❤️ 感情缘分
+${love}。今年有不错的缘分机会，保持开放心态，缘分可能出现在意想不到的场合。
+
+🌈 近期运势
+整体运势平稳向上，贵人运不错，多主动社交、表达想法，会有意外收获。健康方面注意作息规律，避免过度消耗。
+
+✨ 开运建议
+- 幸运色：${open.color}
+- 幸运方位：${open.dir}
+- 幸运数字：${open.num}
+- 小贴士：${open.tip}
+
+以上解读仅供参考，命运掌握在自己手中 🌟`;
+}
+
+// ─── 主流程 ──────────────────────────────────────────────────
+
+const WUXING_COLORS = {
+  木:{bg:"bg-green-500",text:"text-green-300",emoji:"🌳"},
+  火:{bg:"bg-red-500",text:"text-red-300",emoji:"🔥"},
+  土:{bg:"bg-yellow-600",text:"text-yellow-300",emoji:"🪨"},
+  金:{bg:"bg-gray-300",text:"text-gray-300",emoji:"⚔️"},
+  水:{bg:"bg-blue-500",text:"text-blue-300",emoji:"💧"},
+};
+
+function getFortune() {
+  const dateVal = document.getElementById("inp-date").value;
+  const hourVal = document.getElementById("inp-hour").value;
+  if (!dateVal) { alert("请填写出生日期！"); return; }
+  if (hourVal === "") { alert("请选择出生时辰！"); return; }
+
+  const [year, month, day] = dateVal.split("-").map(Number);
+  const hour = parseInt(hourVal);
+  const name = document.getElementById("inp-name").value.trim();
+
+  document.getElementById("result-section").classList.add("hidden");
+  document.getElementById("loading-section").classList.remove("hidden");
+  document.getElementById("btn-start").disabled = true;
+
+  // 模拟推算延迟（增加仪式感）
+  setTimeout(() => {
+    const yearPillar  = getYearPillar(year);
+    const monthPillar = getMonthPillar(year, month);
+    const dayPillar   = getDayPillar(year, month, day);
+    const hourPillar  = getHourPillar(dayPillar[0], hour);
+    const pillars     = [yearPillar, monthPillar, dayPillar, hourPillar];
+    const rizhu       = dayPillar[0];
+    const wuxing      = getWuXing(pillars);
+    const shengxiao   = SHENGXIAO[(year - 4) % 12];
+    const xingzuo     = getXingZuo(month, day);
+    const analysis    = generateAnalysis(name, pillars, wuxing, rizhu);
+
+    // 四柱
+    const labels = ["年柱","月柱","日柱","时柱"];
+    document.getElementById("bazi-pillars").innerHTML = pillars.map((p,i) => `
+      <div class="pillar-card rounded-xl py-3 px-1">
+        <div class="text-purple-400 text-xs mb-2">${labels[i]}</div>
+        <div class="text-2xl font-bold text-yellow-200">${p[0]}</div>
+        <div class="text-2xl font-bold text-orange-200">${p[1]}</div>
+      </div>`).join("");
+
+    document.getElementById("bazi-meta").innerHTML = `
+      <span>🐾 ${shengxiao}</span>
+      <span>⭐ ${xingzuo}座</span>
+      <span>🔑 日主 ${rizhu}（${WUXING_TG[rizhu]||""}）</span>`;
+
+    // 五行
+    document.getElementById("wuxing-bars").innerHTML = Object.entries(wuxing).map(([name,val]) => {
+      const pct = Math.round((val/8)*100);
+      const c = WUXING_COLORS[name];
+      return `<div class="flex items-center gap-3">
+        <span class="w-10 text-xs ${c.text}">${c.emoji} ${name}</span>
+        <div class="flex-1 bg-white/10 rounded-full h-2 overflow-hidden">
+          <div class="wuxing-bar ${c.bg} h-2 rounded-full" style="width:${pct}%"></div>
+        </div>
+        <span class="w-4 text-xs text-white/40">${val}</span>
+      </div>`;
+    }).join("");
+
+    // AI 解读（打字机）
+    const el = document.getElementById("analysis-content");
+    el.textContent = "";
+    el.classList.add("cursor");
+    let i = 0;
+    const timer = setInterval(() => {
+      el.textContent += analysis[i++];
+      if (i >= analysis.length) { clearInterval(timer); el.classList.remove("cursor"); }
+    }, 12);
+
+    document.getElementById("loading-section").classList.add("hidden");
+    document.getElementById("result-section").classList.remove("hidden");
+    document.getElementById("btn-start").disabled = false;
+    document.getElementById("result-section").scrollIntoView({behavior:"smooth"});
+  }, 2200);
+}
+
+function resetForm() {
+  document.getElementById("result-section").classList.add("hidden");
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+</script>
+</body>
+</html>
